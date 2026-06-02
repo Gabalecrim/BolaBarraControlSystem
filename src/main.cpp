@@ -6,13 +6,13 @@
 #define SERVO_PIN 9
 #define SENSOR_PIN 4
 int sensorModel = 20150;
-double Setpoint, Input, Output;
+double Setpoint, Distancia, Output;
 
 SharpIR sensorDistancia(sensorModel, SENSOR_PIN);
 Servo myservo;
 
-double Kp=2, Ki=5, Kd=1;
-PID processPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+double Kp=1, Ki=0, Kd=0;
+PID processPID(&Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 void setup() {
   Serial.begin(115200);
@@ -30,10 +30,7 @@ void setup() {
 }
 
 void loop() {
-  int distancia = sensorDistancia.getDistance();
-
-  Serial.print("Distância: ");
-  Serial.println(distancia);
+  Distancia = sensorDistancia.getDistance();
 
   processPID.Compute();
 
@@ -43,7 +40,7 @@ void loop() {
   myservo.write(servoAngle);
 
   Serial.print("Posicao: ");
-  Serial.print(Input);
+  Serial.print(Distancia);
 
   Serial.print(" cm | Setpoint: ");
   Serial.print(Setpoint);
