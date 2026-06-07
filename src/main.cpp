@@ -3,51 +3,80 @@
 #include <PID_v1.h>
 #include <Servo.h>
 
-#define SERVO_PIN 9
-#define SENSOR_PIN 4
-int sensorModel = 20150;
-double Setpoint, Distancia, Output;
+#define SERVO_PIN 14
+#define SENSOR_PIN 35
 
-SharpIR sensorDistancia(sensorModel, SENSOR_PIN);
+SharpIR sensorDistancia(SharpIR::GP2Y0A41SK0F, SENSOR_PIN);
+
 Servo myservo;
 
-double Kp=1, Ki=0, Kd=0;
-PID processPID(&Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+double Setpoint, Distancia, Output;
+
+double Kp = 3.0, Ki = 0.0, Kd = 1.0;
+
+PID processPID( &Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT );
+
+double distanciaFiltrada = 0.0;
+const double alpha = 0.2;
+
+const uint32_t SAMPLE_TIME_MS = 20;
+uint32_t lastUpdate = 0;
 
 void setup() {
   Serial.begin(115200);
   myservo.attach(SERVO_PIN);
 
-  Setpoint = 100;
+  Setpoint = 15.0;
+
+  distanciaFiltrada = sensorDistancia.getDistance();
+  Distancia = distanciaFiltrada;
 
   processPID.SetOutputLimits(-30, 30);
-  processPID.SetSampleTime(20);
-
+  processPID.SetSampleTime(SAMPLE_TIME_MS);
   processPID.SetMode(AUTOMATIC);
 
   myservo.write(90);
-  Serial.println("Sistema iniciado");
+
+  Serial.println(" Sistema iniciado");
 }
 
 void loop() {
-  Distancia = sensorDistancia.getDistance();
 
-  processPID.Compute();
+  if (millis() - lastUpdate >= SAMPLE_TIME_MS) {
+    lastUpdate = millis();
 
-  int servoAngle = (int)(90 + Output);
-  servoAngle = constrain(servoAngle, 60, 120);
+    double leitura = sensorDistancia.getDistance();
 
-  myservo.write(servoAngle);
+    distanciaFiltrada = (1.0 - alpha) * distanciaFiltrada + alpha * leitura;
 
-  Serial.print("Posicao: ");
-  Serial.print(Distancia);
+    Distancia = distanciaFiltrada;
 
-  Serial.print(" cm | Setpoint: ");
-  Serial.print(Setpoint);
+    processPID.Compute();
 
-  Serial.print(" | PID: ");
-  Serial.print(Output);
+    int servoAngle = (int)(90 + Output);
 
-  Serial.print(" | Servo: ");
-  Serial.println(servoAngle);
+    servoAngle = constrain( servoAngle, 60, 120 );
+
+    myservo.write(servoAngle);
+
+    double erro = Setpoint - Distancia;
+
+    Serial.print("Leitura: ");
+    Serial.print(leitura);
+
+    Serial.print(" cm | Filtrada: ");
+    Serial.print(Distancia, 2);
+
+    Serial.print(" cm | Setpoint: ");
+    Serial.print(Setpoint);
+
+    Serial.print(" | Erro: ");
+    Serial.print(erro, 2);
+
+    Serial.print(" | PID: ");
+    Serial.print(Output, 2);
+
+    Serial.print(" | Servo: ");
+    Serial.println(servoAngle);
+  }
 }
