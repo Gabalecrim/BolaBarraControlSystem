@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <PID_v1.h>
 #include <Servo.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
 
 #define SERVO_PIN 14
 #define SENSOR_PIN 35
@@ -49,8 +51,11 @@ CalibrationPoint tabela[] = {
 };
 
 const int NUM_PONTOS = sizeof(tabela) / sizeof(tabela[0]);
+#define SECRET_SSID "gab"
+#define SECRET_PASS "12345678"
+#define MSG_BUFFER_SIZE	(50)
+const char* mqtt_server = "192.168.137.1";
 
-Servo myservo;
 
 double Setpoint, Distancia, Output;
 double Kp = 2.50, Ki = 0.2, Kd = 3;
@@ -151,13 +156,20 @@ void processSerialCommands()
   }
 }
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   pinMode(SENSOR_PIN, INPUT);
   myservo.attach(SERVO_PIN);
 
-  Setpoint = 15;
+  client.setServer(mqtt_server, 1900);
+  client.setCallback(callback);
+
+  setup_wifi();
+  printWifiStatus();
+
+  Setpoint = 15.0;
+
+  distanciaFiltrada = sensorDistancia.getDistance();
   Distancia = distanciaFiltrada;
 
   processPID.SetOutputLimits(-400, 400);
@@ -180,6 +192,10 @@ void setup()
 void loop()
 {
   processSerialCommands();
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
 
   if (millis() - ultimoUpdatePID >= SAMPLE_TIME_MS)
   {
@@ -190,6 +206,7 @@ void loop()
     distanciaFiltrada = (1.0 - alpha) * distanciaFiltrada + alpha * leitura;
 
     Distancia = distanciaFiltrada;
+    client.publish("Distancia", String(Distancia).c_str());
 
     processPID.Compute();
 
@@ -198,6 +215,7 @@ void loop()
 
   float dt = (millis() - ultimoScan) / 1000.0f;
   ultimoScan = millis();
+    client.publish("servoAngle", String(servoAngle).c_str());
 
   if (dt <= 0.0f)
   {
