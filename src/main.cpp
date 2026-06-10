@@ -7,6 +7,11 @@
 #define SERVO_PIN 14
 #define SENSOR_PIN 35
 
+#define SECRET_SSID "gab"
+#define SECRET_PASS "12345678"
+#define MSG_BUFFER_SIZE	(50)
+const char* mqtt_server = "192.168.137.1";
+
 float angAtual;
 float acelAtual;
 float velAtual;
@@ -221,6 +226,7 @@ void loop()
   {
     dt = SAMPLE_TIME_MS / 1000.0f;
   }
+    client.publish("servoAngle", String(servoAngle).c_str());
 
   double erro = Setpoint - Distancia;
 
