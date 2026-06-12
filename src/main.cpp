@@ -42,14 +42,14 @@ Servo myservo;
 
 double Setpoint, Distancia, Output;
 
-double Kp = 3.0, Ki = 0.0, Kd = 1.0;
+double Kp = 5, Ki = 300, Kd = 15;
 
 PID processPID( &Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT );
 
 double distanciaFiltrada = 0.0;
 const double alpha = 0.95;
 
-const uint32_t SAMPLE_TIME_MS = 20;
+const uint32_t SAMPLE_TIME_MS = 16;
 uint32_t lastUpdate = 0;
 
 float distanciaInterpolada(double adc)
@@ -85,11 +85,10 @@ void setup() {
   pinMode(SENSOR_PIN, INPUT);
   myservo.attach(SERVO_PIN);
 
-  Setpoint = 15.0;
-
+  Setpoint = 12.5;
   Distancia = distanciaFiltrada;
 
-  processPID.SetOutputLimits(-30, 30);
+  processPID.SetOutputLimits(-60, 60);
   processPID.SetSampleTime(SAMPLE_TIME_MS);
   processPID.SetMode(AUTOMATIC);
 
@@ -106,15 +105,13 @@ void loop() {
     double leitura = distanciaInterpolada(analogRead(SENSOR_PIN));
 
     distanciaFiltrada = (1.0 - alpha) * distanciaFiltrada + alpha * leitura;
-
     Distancia = distanciaFiltrada;
 
     processPID.Compute();
 
+    float pidResult = Output / 1000000;
     int servoAngle = (int)(90 + Output);
-
-    servoAngle = constrain( servoAngle, 60, 120 );
-
+    servoAngle = constrain( servoAngle, 30, 170 );
     myservo.write(servoAngle);
 
     double erro = Setpoint - Distancia;
@@ -123,19 +120,15 @@ void loop() {
     Serial.print(leitura);
     
     Serial.print(" cm | Filtrada: ");
-    Serial.println(Distancia, 2);
-    delay(200);
-
-    // Serial.print(" cm | Setpoint: ");
-    // Serial.print(Setpoint);
+    Serial.print(Distancia, 2);
 
     // Serial.print(" | Erro: ");
     // Serial.print(erro, 2);
 
-    // Serial.print(" | PID: ");
-    // Serial.print(Output, 2);
+    Serial.print(" | PID: ");
+    Serial.print(Output, 2);
 
-    // Serial.print(" | Servo: ");
-    // Serial.println(servoAngle);
+    Serial.print(" | Servo: ");
+    Serial.println(servoAngle);
   }
 }
