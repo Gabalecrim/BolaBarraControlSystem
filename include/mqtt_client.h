@@ -1,7 +1,7 @@
 #pragma once
 
 #include <PubSubClient.h>
-#include "wifi_service.h"
+#include "wifi_manager.h"
 
 extern PubSubClient client;
 

@@ -32,7 +32,7 @@ void setup() {
   setup_wifi();
   printWifiStatus();
 
-  Setpoint = 15.0;
+  Setpoint = 12.5;
 
   processPID.SetOutputLimits(-60, 60);
   processPID.SetSampleTime(SAMPLE_TIME_MS);
