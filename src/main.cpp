@@ -5,6 +5,14 @@
 #define SERVO_PIN 14
 #define SENSOR_PIN 35
 
+float angAtual;
+float velAtual;
+float velMax = 30;
+float acelMax = 200;
+
+float pos = 0;
+float angDestino = 0;
+
 struct CalibrationPoint {
     int adc;
     float distancia_mm;
@@ -41,14 +49,15 @@ const int NUM_PONTOS = sizeof(tabela) / sizeof(tabela[0]);
 Servo myservo;
 
 double Setpoint, Distancia, Output;
-double Kp = 1, Ki = 0, Kd = 0;
+double Kp = 0.65, Ki = 0, Kd = 0.04;
 PID processPID(&Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 double distanciaFiltrada = 0.0;
 const double alpha = 0.95;
 
 const uint32_t SAMPLE_TIME_MS = 10;
-uint32_t lastUpdate = 0;
+uint32_t ultimoUpdatePID = 0;
+uint32_t ultimoScan = 0;
 
 float distanciaInterpolada(double adc)
 {
@@ -96,7 +105,7 @@ void printPIDStatus()
 void processSerialCommands()
 {
   if (!Serial.available())
-    return 0;
+    return;
 
   String command = Serial.readStringUntil('\n');
   command.trim();
@@ -150,7 +159,7 @@ void setup() {
   processPID.SetSampleTime(SAMPLE_TIME_MS);
   processPID.SetMode(AUTOMATIC);
 
-  myservo.write(90);
+  myservo.writeMicroseconds(1500);
 
   Serial.println(" Sistema iniciado");
   printPIDStatus();
@@ -159,8 +168,8 @@ void setup() {
 void loop() {
   processSerialCommands();
 
-  if (millis() - lastUpdate >= SAMPLE_TIME_MS) {
-    lastUpdate = millis();
+  if (millis() - ultimoUpdatePID >= SAMPLE_TIME_MS) {
+    ultimoUpdatePID = millis();
 
     double leitura = distanciaInterpolada(analogRead(SENSOR_PIN));
 
@@ -169,28 +178,52 @@ void loop() {
 
     processPID.Compute();
 
-    int servoAngle = (int)(90 + Output);
-    servoAngle = constrain(servoAngle, 30, 170);
-    myservo.write(servoAngle);
-
-    double erro = Setpoint - Distancia;
-
-    Serial.print("Distancia: ");
-    Serial.print(Distancia, 2);
-
-    Serial.print(" cm | kp : ");
-    Serial.print(Kp, 2);
-
-    Serial.print(" | ki : ");
-    Serial.print(Ki, 2);
-
-    Serial.print(" | kd : ");
-    Serial.print(Kd, 2);
-
-    Serial.print(" | PID: ");
-    Serial.print(Output, 2);
-
-    Serial.print(" | Servo: ");
-    Serial.println(servoAngle);
+    angDestino = (int)(90 + Output);
   }
+  double erro = Setpoint - Distancia;
+
+  float direcao = (erro > 0) ? 1 : -1; 
+  float angFreio = ( velAtual * velAtual) / ( acelMax * 2 );
+  float angulo = abs(angDestino - angAtual);
+
+  float dt = (millis() - ultimoScan) / 1000.0;
+  ultimoScan = millis();
+  
+  if (angulo > angFreio){
+    velAtual += acelMax * dt * direcao;
+  } else {
+    velAtual -= acelMax * dt * direcao;
+  }
+
+  velAtual = constrain(velAtual, -velMax, velMax);
+
+  pos += velAtual * dt;
+
+  float servoAngle = 1500 + pos;
+  
+  angAtual = servoAngle;
+  servoAngle = constrain(servoAngle, 1100, 1900);
+  myservo.writeMicroseconds(servoAngle);
+
+
+  Serial.print("pos: ");
+  Serial.print(pos, 2);
+
+  Serial.print("| Distancia: ");
+  Serial.print(Distancia, 2);
+
+  Serial.print(" cm | kp : ");
+  Serial.print(Kp, 2);
+
+  Serial.print(" | ki : ");
+  Serial.print(Ki, 2);
+
+  Serial.print(" | kd : ");
+  Serial.print(Kd, 2);
+
+  Serial.print(" | PID: ");
+  Serial.print(Output, 2);
+
+  Serial.print(" | Servo: ");
+  Serial.println(servoAngle);
 }
