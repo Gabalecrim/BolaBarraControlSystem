@@ -61,6 +61,11 @@ const int NUM_PONTOS = sizeof(tabela) / sizeof(tabela[0]);
 #define MSG_BUFFER_SIZE	(50)
 const char* mqtt_server = "192.168.137.1";
 
+#include "config/config.h"
+#include "serial_service.h"
+#include "wifi_service.h"
+#include "mqtt_service.h"
+#include "sensor.h"
 
 double Setpoint, Distancia, Output;
 double Kp = 2.50, Ki = 0.2, Kd = 3;
@@ -160,13 +165,19 @@ void processSerialCommands()
     printPIDStatus();
   }
 }
+int status = WL_IDLE_STATUS;
+unsigned long lastMsg = 0;
+
+char msg[MSG_BUFFER_SIZE];
+
+Servo myservo;
 
 void setup() {
   Serial.begin(115200);
   pinMode(SENSOR_PIN, INPUT);
   myservo.attach(SERVO_PIN);
 
-  client.setServer(mqtt_server, 1900);
+  client.setServer(MQTT_SERVER, 1900);
   client.setCallback(callback);
 
   setup_wifi();
@@ -191,7 +202,7 @@ void setup() {
   ultimoScan = millis();
 
   Serial.println(" Sistema iniciado");
-  printPIDStatus();
+  printPIDStatus( Kp, Ki, Kd, Setpoint );
 }
 
 void loop()
