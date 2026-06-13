@@ -62,9 +62,9 @@ const int NUM_PONTOS = sizeof(tabela) / sizeof(tabela[0]);
 const char* mqtt_server = "192.168.137.1";
 
 #include "config/config.h"
-#include "serial_service.h"
-#include "wifi_service.h"
-#include "mqtt_service.h"
+#include "serial_console.h"
+#include "wifi_manager.h"
+#include "mqtt_client.h"
 #include "sensor.h"
 
 double Setpoint, Distancia, Output;
