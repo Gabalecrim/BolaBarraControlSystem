@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include "wifi_service.h"
+#include "wifi_manager.h"
 #include "config/config.h"
 
 WiFiClient espClient;

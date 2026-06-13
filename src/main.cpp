@@ -2,9 +2,9 @@
 #include <PID_v1.h>
 #include <Servo.h>
 #include "config/config.h"
-#include "serial_service.h"
-#include "wifi_service.h"
-#include "mqtt_service.h"
+#include "serial_console.h"
+#include "wifi_manager.h"
+#include "mqtt_client.h"
 #include "sensor.h"
 
 double Setpoint, Distancia, Output;

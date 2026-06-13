@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <PubSubClient.h>
-#include "mqtt_service.h"
-#include "wifi_service.h"
+#include "mqtt_client.h"
+#include "wifi_manager.h"
 
 PubSubClient client(espClient);
 
