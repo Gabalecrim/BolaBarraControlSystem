@@ -6,9 +6,13 @@
 #define SENSOR_PIN 35
 
 float angAtual;
+float acelAtual;
 float velAtual;
-float velMax = 333;
-float acelMax = 1667;
+float velMax = 150;
+float acelMax = 900;
+float jerkMax = 1667;
+const float ganhoPos = 2.0f;
+const float ganhoVel = 6.0f;
 
 float pos = 0;
 float angDestino = 0;
@@ -49,11 +53,11 @@ const int NUM_PONTOS = sizeof(tabela) / sizeof(tabela[0]);
 Servo myservo;
 
 double Setpoint, Distancia, Output;
-double Kp = 0.65, Ki = 0, Kd = 0.04;
+double Kp = 2.50, Ki = 0.2, Kd = 3;
 PID processPID(&Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 double distanciaFiltrada = 0.0;
-const double alpha = 0.95;
+const double alpha = 0.80;
 
 const uint32_t SAMPLE_TIME_MS = 10;
 uint32_t ultimoUpdatePID = 0;
@@ -153,17 +157,21 @@ void setup()
   pinMode(SENSOR_PIN, INPUT);
   myservo.attach(SERVO_PIN);
 
-  Setpoint = 12.5;
+  Setpoint = 15;
   Distancia = distanciaFiltrada;
 
   processPID.SetOutputLimits(-400, 400);
   processPID.SetSampleTime(SAMPLE_TIME_MS);
   processPID.SetMode(AUTOMATIC);
 
-  myservo.writeMicroseconds(1500);
+  myservo.writeMicroseconds(1295);
 
-  angAtual = 1500;
-  pos = 1500;
+  angAtual = 1295;
+  acelAtual = 0;
+  velAtual = 0;
+  pos = 1295;
+  angDestino = 1295;
+  ultimoScan = millis();
 
   Serial.println(" Sistema iniciado");
   printPIDStatus();
@@ -185,37 +193,54 @@ void loop()
 
     processPID.Compute();
 
-    angDestino = 1500 + Output;
+    angDestino = 1295 + Output;
+  }
+
+  float dt = (millis() - ultimoScan) / 1000.0f;
+  ultimoScan = millis();
+
+  if (dt <= 0.0f)
+  {
+    dt = SAMPLE_TIME_MS / 1000.0f;
   }
 
   double erro = Setpoint - Distancia;
 
-  float direcao = (angDestino > angAtual) ? 1 : -1;
+  // Controle de posicao: transforma o erro de PWM em uma velocidade alvo.
+  float erroPos = angDestino - pos;
+  float velDesejada = erroPos * ganhoPos;
+  velDesejada = constrain(velDesejada, -velMax, velMax);
 
-  float angFreio = (velAtual * velAtual) / (acelMax * 2);
+  // Controle de velocidade: converte o erro de velocidade em aceleracao alvo.
+  float acelDesejada = (velDesejada - velAtual) * ganhoVel;
 
-  float angulo = abs(angDestino - angAtual);
+  // Limitacao de aceleracao: mantem a aceleracao dentro do envelope configurado.
+  acelDesejada = constrain(acelDesejada, -acelMax, acelMax);
 
-  float dt = (millis() - ultimoScan) / 1000.0;
-  ultimoScan = millis();
+  // Limitacao de jerk: suaviza a transicao da aceleracao a cada ciclo.
+  float deltaAcel = acelDesejada - acelAtual;
+  deltaAcel = constrain(deltaAcel, -jerkMax * dt, jerkMax * dt);
+  acelAtual += deltaAcel;
+  acelAtual = constrain(acelAtual, -acelMax, acelMax);
 
-  if (angulo > angFreio)
-  {
-    velAtual += acelMax * dt * direcao;
-  }
-  else
-  {
-    velAtual -= acelMax * dt * direcao;
-  }
-
+  velAtual = constrain(velAtual, -velMax, velMax);
+  velAtual += acelAtual * dt;
   velAtual = constrain(velAtual, -velMax, velMax);
 
   pos += velAtual * dt;
+  pos = constrain(pos, 1100.0f, 1900.0f);
 
-  float servoPWM = pos;
+  // if ((pos <= 1100.0f && velAtual < 0.0f) || (pos >= 1900.0f && velAtual > 0.0f))
+  // {
+  //   velAtual = 0.0f;
+  //   if ((pos <= 1100.0f && acelAtual < 0.0f) || (pos >= 1900.0f && acelAtual > 0.0f))
+  //   {
+  //     acelAtual = 0.0f;
+  //   }
+  // }
+
+  float servoPWM = constrain(pos, 1100.0f, 1900.0f);
   angAtual = servoPWM;
-
-  servoPWM = constrain(servoPWM, 1100, 1900);
 
   myservo.writeMicroseconds(servoPWM);
 
