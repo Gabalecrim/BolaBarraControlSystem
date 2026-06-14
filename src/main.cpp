@@ -12,10 +12,23 @@ double Kp = 2.50, Ki = 0.2, Kd = 3;
 PID processPID(&Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 double distanciaFiltrada = 0.0;
-uint32_t lastUpdate = 0;
+uint32_t ultimoUpdatePID = 0;
+uint32_t ultimoScan = 0;
 
 int status = WL_IDLE_STATUS;
 unsigned long lastMsg = 0;
+
+float angAtual;
+float acelAtual;
+float velAtual;
+float velMax = 150;
+float acelMax = 900;
+float jerkMax = 1667;
+const float ganhoPos = 2.0f;
+const float ganhoVel = 6.0f;
+
+float pos = 0;
+float angDestino = 0;
 
 char msg[MSG_BUFFER_SIZE];
 
@@ -65,7 +78,7 @@ void loop() {
 
     double leitura = distanciaInterpolada(analogRead(SENSOR_PIN));
 
-    distanciaFiltrada = (1.0 - alpha) * distanciaFiltrada + alpha * leitura;
+    distanciaFiltrada = (1.0 - ALPHA) * distanciaFiltrada + ALPHA * leitura;
 
     Distancia = distanciaFiltrada;
     client.publish("Distancia", String(Distancia).c_str());
@@ -76,6 +89,15 @@ void loop() {
     servoAngle = constrain(servoAngle, 30, 170);
     myservo.write(servoAngle);
     client.publish("servoAngle", String(servoAngle).c_str());
+  }
+
+  float dt = (millis() - ultimoScan) / 1000.0f;
+  ultimoScan = millis();
+
+  if (dt <= 0.0f)
+  {
+    dt = SAMPLE_TIME_MS / 1000.0f;
+  }
 
   double erro = Setpoint - Distancia;
 
