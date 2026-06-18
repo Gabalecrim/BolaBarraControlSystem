@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <PID_v1.h>
 #include <Servo.h>
 #include "config/config.h"
@@ -14,6 +15,10 @@ PID processPID(&Distancia, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 double distanciaFiltrada = 0.0;
 uint32_t ultimoUpdatePID = 0;
 uint32_t ultimoScan = 0;
+uint32_t ultimoTelemetry = 0;
+
+float SAMPLE_TIME_MS = 10.0f;
+float ALPHA = 0.90f;
 
 int status = WL_IDLE_STATUS;
 unsigned long lastMsg = 0;
@@ -24,8 +29,8 @@ float velAtual;
 float velMax = 150;
 float acelMax = 900;
 float jerkMax = 1667;
-const float ganhoPos = 2.0f;
-const float ganhoVel = 6.0f;
+float ganhoPos = 2.0f;
+float ganhoVel = 6.0f;
 
 float pos = 0;
 float angDestino = 0;
@@ -40,6 +45,7 @@ void setup() {
   myservo.attach(SERVO_PIN);
 
   client.setServer(MQTT_SERVER, 1900);
+  client.setBufferSize(512);
   client.setCallback(callback);
 
   setup_wifi();
@@ -47,8 +53,8 @@ void setup() {
 
   Setpoint = 12.5;
 
-  processPID.SetOutputLimits(-400, 400);
-  processPID.SetSampleTime(SAMPLE_TIME_MS);
+  processPID.SetOutputLimits(-1000, 1000);
+  processPID.SetSampleTime((int)SAMPLE_TIME_MS);
   processPID.SetMode(AUTOMATIC);
 
   double leitura = distanciaInterpolada(analogRead(SENSOR_PIN));
@@ -58,7 +64,7 @@ void setup() {
   angAtual = 1295;
   acelAtual = 0;
   velAtual = 0;
-  pos = 1295;
+  pos = 0;
   angDestino = 1295;
   ultimoScan = millis();
 
@@ -85,10 +91,7 @@ void loop() {
 
     processPID.Compute();
 
-    int servoAngle = (int)(90 + Output);
-    servoAngle = constrain(servoAngle, 30, 170);
-    myservo.write(servoAngle);
-    client.publish("servoAngle", String(servoAngle).c_str());
+    angDestino = 1295 + Output;
   }
 
   float dt = (millis() - ultimoScan) / 1000.0f;
@@ -123,13 +126,13 @@ void loop() {
   velAtual = constrain(velAtual, -velMax, velMax);
 
   pos += velAtual * dt;
-  pos = constrain(pos, 1100.0f, 1900.0f);
+  pos = constrain(pos, 800.0f, 1800.0f);
 
-  float servoPWM = constrain(pos, 1100.0f, 1900.0f);
+  float servoPWM = constrain(1295 + (pos - 1295), 800.0f, 1800.0f);
+
   angAtual = servoPWM;
 
   myservo.writeMicroseconds(servoPWM);
-  client.publish("servoAngle", String(servoPWM).c_str());
 
   Serial.print("pos: ");
   Serial.print(pos, 2);
@@ -151,4 +154,14 @@ void loop() {
 
   Serial.print(" | Servo: ");
   Serial.println(servoPWM);
+
+  if (millis() - ultimoTelemetry >= 100)
+  {
+    ultimoTelemetry = millis();
+
+    client.publish("Distancia", String(Distancia, 2).c_str());
+    client.publish("Setpoint", String(Setpoint, 2).c_str());
+    client.publish("PID", String(Output, 2).c_str());
+    client.publish("servoPWM", String(servoPWM, 0).c_str());
+  }
 }

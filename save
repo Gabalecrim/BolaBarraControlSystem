@@ -1,0 +1,225 @@
+<template>
+  <div class="container">
+
+    <div class="scene">
+
+      <div
+        class="beam"
+        :style="{
+          transform: `rotate(${beamAngle}deg)`
+        }"
+      >
+        <div
+          class="setpoint-marker"
+          :style="{
+            left: setpointPosition + 'px'
+          }"
+        ></div>
+
+        <div
+          class="ball"
+          :style="{
+            left: ballPosition + 'px'
+          }"
+        ></div>
+
+      </div>
+
+    </div>
+
+    <div class="info">
+
+      <div>
+        Distância:
+        <strong>{{ distancia.toFixed(2) }} cm</strong>
+      </div>
+
+      <div>
+        Setpoint:
+        <strong>{{ setpoint.toFixed(2) }} cm</strong>
+      </div>
+
+      <div>
+        Erro:
+        <strong>{{ erro.toFixed(2) }} cm</strong>
+      </div>
+
+      <div>
+        PID:
+        <strong>{{ pid.toFixed(2) }}</strong>
+      </div>
+
+      <div>
+        Servo PWM:
+        <strong>{{ servoPWM }}</strong>
+      </div>
+
+      <div>
+        Inclinação:
+        <strong>{{ beamAngle.toFixed(1) }}°</strong>
+      </div>
+
+    </div>
+
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      distancia: 0,
+      setpoint: 12.5,
+      pid: 0,
+      servoPWM: 1295
+    }
+  },
+
+  computed: {
+
+    erro() {
+      return this.setpoint - this.distancia
+    },
+
+    beamAngle() {
+
+      const pwmMin = 1100
+      const pwmCentro = 1295
+      const pwmMax = 1900
+
+      const maxVisualAngle = 25
+
+      return (
+        (this.servoPWM - pwmCentro) /
+        (pwmMax - pwmCentro)
+      ) * maxVisualAngle
+    },
+
+    ballPosition() {
+      return this.distanceToPixel(this.distancia)
+    },
+
+    setpointPosition() {
+      return this.distanceToPixel(this.setpoint)
+    }
+  },
+
+  methods: {
+
+    distanceToPixel(value) {
+
+      const minDist = 3
+      const maxDist = 25
+
+      const beamWidth = 500
+      const ballSize = 30
+
+      let pos =
+        ((value - minDist) /
+          (maxDist - minDist))
+        * (beamWidth - ballSize)
+
+      return Math.max(
+        0,
+        Math.min(pos, beamWidth - ballSize)
+      )
+    }
+  },
+
+  watch: {
+    msg: {
+      immediate: true,
+      handler(msg) {
+
+        if (!msg?.payload) return
+
+        this.distancia =
+          Number(msg.payload.distancia || 0)
+
+        this.setpoint =
+          Number(msg.payload.setpoint || 0)
+
+        this.pid =
+          Number(msg.payload.pid || 0)
+
+        this.servoPWM =
+          Number(msg.payload.servoPWM || 1295)
+      }
+    }
+  }
+}
+</script>
+
+<style>
+.container {
+  padding: 20px;
+}
+
+.scene {
+  height: 260px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.beam {
+  width: 500px;
+  height: 12px;
+
+  background: #555;
+
+  position: relative;
+
+  transform-origin: left center;
+
+  transition: transform 0.1s linear;
+}
+
+.ball {
+  width: 30px;
+  height: 30px;
+
+  border-radius: 50%;
+
+  background: #ff4444;
+
+  position: absolute;
+
+  top: -28px;
+
+  transition: left 0.1s linear;
+}
+
+.setpoint-marker {
+
+  width: 4px;
+  height: 50px;
+
+  background: #00ff88;
+
+  position: absolute;
+
+  top: -20px;
+
+  transition: left 0.1s linear;
+}
+
+.info {
+
+  margin-top: 25px;
+
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+
+  gap: 10px;
+
+  font-size: 16px;
+
+  color: white;
+}
+
+strong {
+  font-weight: 600;
+}
+</style>
